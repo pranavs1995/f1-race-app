@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Race Application — Lap Timing &amp; Pit Stop Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt: #14161a;
+    --panel: #1c1f26;
+    --panel-line: #2b2f38;
+    --text: #e9ebf0;
+    --text-dim: #8b90a0;
+    --amber: #ffb300;
+    --teal: #21d6b5;
+    --red: #ef4b45;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --display: 'Space Grotesk', ui-sans-serif, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,255,255,0.025) 38px 40px),
+      var(--asphalt);
+    color:var(--text);
+    font-family:var(--display);
+    padding:32px 20px 60px;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    border-bottom:1px solid var(--panel-line);
+    padding-bottom:18px;
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--amber);
+    text-transform:uppercase;
+  }
+  h1{font-size:26px;margin:4px 0 0;font-weight:700;letter-spacing:-0.01em;}
+  .track-meta{font-family:var(--mono);font-size:12px;color:var(--text-dim);text-align:right;line-height:1.6;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+  @media (max-width:720px){.grid{grid-template-columns:1fr;}}
+
+  .car-panel{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .car-panel::before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:4px;
+    background:var(--car-accent);
+  }
+  .car-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;}
+  .car-name{font-size:18px;font-weight:600;}
+  .car-id{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+
+  .stat-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 16px;
+    font-family:var(--mono);
+    font-size:13px;
+    margin-bottom:14px;
+  }
+  .stat-label{color:var(--text-dim);font-size:11px;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:2px;}
+  .stat-value{font-size:16px;font-weight:600;}
+
+  .tyre-bar-track{
+    height:8px;border-radius:4px;background:#0f1116;
+    overflow:hidden;margin-top:4px;
+  }
+  .tyre-bar-fill{height:100%;border-radius:4px;transition:width .25s ease, background .25s ease;}
+
+  .badge{
+    display:inline-block;font-family:var(--mono);font-size:11px;
+    padding:3px 8px;border-radius:100px;letter-spacing:.04em;
+    margin-top:2px;
+  }
+  .badge-ok{background:rgba(33,214,181,.12);color:var(--teal);}
+  .badge-alert{background:rgba(239,75,69,.15);color:var(--red);}
+  .badge-pit{background:rgba(255,179,0,.15);color:var(--amber);}
+  .badge-finished{background:rgba(255,255,255,.1);color:var(--text);}
+
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+  button{
+    font-family:var(--mono);font-size:12px;
+    background:#262a33;color:var(--text);
+    border:1px solid var(--panel-line);
+    border-radius:6px;padding:8px 10px;cursor:pointer;
+  }
+  button:hover:not(:disabled){border-color:var(--car-accent);color:var(--car-accent);}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+
+  .speed-row{display:flex;gap:6px;margin-top:8px;align-items:center;}
+  .speed-row input{
+    width:80px;font-family:var(--mono);font-size:12px;
+    background:#12141a;border:1px solid var(--panel-line);border-radius:6px;
+    color:var(--text);padding:7px 8px;
+  }
+
+  .winner-banner{
+    display:none;
+    background:linear-gradient(90deg, rgba(255,179,0,.15), rgba(33,214,181,.10));
+    border:1px solid var(--amber);
+    border-radius:10px;
+    padding:16px 20px;
+    margin-bottom:18px;
+    font-family:var(--mono);
+    font-size:14px;
+  }
+  .winner-banner.show{display:block;}
+  .winner-banner b{color:var(--amber);font-size:16px;}
+
+  .log-panel{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:16px 20px;
+  }
+  .log-panel h2{
+    font-size:12px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--text-dim);margin:0 0 10px;font-weight:600;
+  }
+  #log{
+    font-family:var(--mono);font-size:12.5px;line-height:1.7;
+    max-height:220px;overflow-y:auto;color:var(--text-dim);
+  }
+  #log div.entry-fresh{color:var(--text);}
+  #log div{border-bottom:1px dashed rgba(255,255,255,.05);padding:2px 0;}
+
+  footer{
+    margin-top:24px;font-family:var(--mono);font-size:11px;
+    color:var(--text-dim);text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="eyebrow">SECL ZG501 — SQAT · Problem 3</div>
+      <h1>Formula One Race Application</h1>
+    </div>
+    <div class="track-meta">
+      TOTAL LAPS: 3&nbsp;&nbsp;|&nbsp;&nbsp;SPEED RANGE: 250–350 KMPH<br>
+      TYRE ALERT THRESHOLD: 120°C<br>
+      <span id="connStatus" style="color:var(--text-dim);">connecting to backend…</span>
+      &nbsp;&nbsp;<button id="resetBtn" style="font-size:11px;padding:4px 8px;">Reset race</button>
+    </div>
+  </header>
+
+  <div id="winnerBanner" class="winner-banner"></div>
+
+  <div class="grid" id="carGrid"></div>
+
+  <div class="log-panel">
+    <h2>Race Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <footer>Lap Timing &amp; Pit Stop Management module — this page is a thin client; all race logic runs server-side in car.py / race_engine.py via app.py (see repository)</footer>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   API client — NO race logic lives here. Every action (complete a
+   lap, enter/exit pit, record speed) is a call to the Flask backend
+   (app.py), which runs the exact car.py / race_engine.py classes
+   covered by test_race_module.py. This page only renders whatever
+   state the server returns, so the UI and the tested backend can
+   never disagree.
+---------------------------------------------------------------- */
+const API_BASE = window.location.protocol === "file:" ? "http://127.0.0.1:5000" : "";
+const TYRE_MAX_SAFE_TEMP_C = 120; // display-only threshold, matches backend constant
+
+let latestState = { cars: [], winner: null, payout: null };
+
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function log(msg, fresh = true) {
+  const el = document.getElementById("log");
+  const div = document.createElement("div");
+  if (fresh) div.className = "entry-fresh";
+  const t = new Date().toLocaleTimeString();
+  div.textContent = `[${t}] ${msg}`;
+  el.prepend(div);
+}
+
+function renderLog() {
+  const el = document.getElementById("log");
+  el.innerHTML = "";
+  const entries = Array.isArray(latestState.log) ? latestState.log : [];
+  entries.forEach((msg) => {
+    const div = document.createElement("div");
+    div.textContent = msg;
+    el.appendChild(div);
+  });
+}
+
+function setConnStatus(ok, detail) {
+  const el = document.getElementById("connStatus");
+  el.textContent = ok ? "● connected to backend (app.py)" : `● backend unreachable — ${detail}`;
+  el.style.color = ok ? "var(--teal)" : "var(--red)";
+}
+
+async function refreshState() {
+  const data = await api("/api/state");
+  latestState = data;
+  render();
+}
+
+async function callCarAction(carId, path, body, successMsg) {
+  const car = latestState.cars.find(c => c.id === carId);
+  const driverName = car ? car.driver_name : carId;
+  try {
+    const data = await api(`/api/cars/${carId}${path}`, {
+      method: "POST",
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    latestState = data;
+    log(`${driverName}: ${successMsg(data)}`);
+    render();
+  } catch (e) {
+    log(`${driverName}: rejected by server — ${e.message}`);
+  }
+}
+
+function render() {
+  const grid = document.getElementById("carGrid");
+  grid.innerHTML = "";
+  const accents = { A: "#ffb300", B: "#21d6b5" };
+  latestState.cars.forEach(car => grid.appendChild(renderCarPanel(car, accents[car.id] || "#ffb300")));
+  renderWinner();
+  renderLog();
+}
+
+function renderCarPanel(car, accent) {
+  const panel = document.createElement("div");
+  panel.className = "car-panel";
+  panel.style.setProperty("--car-accent", accent);
+
+  const tyrePct = Math.min(100, (car.tyre_temp_c / 150) * 100);
+  const tyreColor = car.tyre_temp_c >= TYRE_MAX_SAFE_TEMP_C ? "var(--red)"
+                    : car.tyre_temp_c >= TYRE_MAX_SAFE_TEMP_C - 15 ? "var(--amber)"
+                    : "var(--teal)";
+
+  let stateBadge = `<span class="badge badge-ok">RACING</span>`;
+  if (car.in_pit) stateBadge = `<span class="badge badge-pit">IN PIT</span>`;
+  if (car.finished) stateBadge = `<span class="badge badge-finished">FINISHED</span>`;
+
+  panel.innerHTML = `
+    <div class="car-head">
+      <div>
+        <div class="car-name">${car.driver_name}</div>
+        <div class="car-id">CAR ${car.id}</div>
+      </div>
+      ${stateBadge}
+    </div>
+
+    <div class="stat-row">
+      <div><span class="stat-label">Lap</span><span class="stat-value">${car.current_lap} / ${car.total_laps}</span></div>
+      <div><span class="stat-label">Laps left</span><span class="stat-value">${car.laps_remaining}</span></div>
+      <div><span class="stat-label">Speed</span><span class="stat-value">${car.last_speed_kmph ?? "—"} kmph</span></div>
+      <div><span class="stat-label">Pit stops</span><span class="stat-value">${car.pit_stop_count}</span></div>
+      <div><span class="stat-label">Avg lap</span><span class="stat-value">${car.current_lap ? (car.average_lap_time_ms / 1000).toFixed(1) + ' s' : '—'}</span></div>
+      <div><span class="stat-label">Tyre status</span><span class="stat-value">${car.tyre_status}</span></div>
+      <div><span class="stat-label">Race time</span><span class="stat-value">${(car.race_time_ms/1000).toFixed(1)} s</span></div>
+      <div><span class="stat-label">Pit time</span><span class="stat-value">${(car.pit_stop_time_ms/1000).toFixed(1)} s</span></div>
+      <div style="grid-column:1/-1;">
+        <span class="stat-label">Total time (decides winner)</span>
+        <span class="stat-value">${(car.total_time_ms/1000).toFixed(1)} s</span>
+      </div>
+    </div>
+
+    <div>
+      <span class="stat-label">Tyre temperature — ${car.tyre_temp_c}°C
+        ${car.tyre_temp_c >= TYRE_MAX_SAFE_TEMP_C ? '<span class="badge badge-alert">BLAST RISK — PIT NOW</span>' : ''}
+      </span>
+      <div class="tyre-bar-track"><div class="tyre-bar-fill" style="width:${tyrePct}%; background:${tyreColor};"></div></div>
+    </div>
+
+    <div class="speed-row">
+      <input type="number" min="0" max="500" placeholder="kmph" data-role="speed-input"/>
+      <button data-action="speed">Record speed</button>
+    </div>
+
+    <div class="controls">
+      <button data-action="lap" ${car.finished || car.in_pit ? "disabled" : ""}>Complete lap</button>
+      <button data-action="enter-pit" ${car.finished || car.in_pit ? "disabled" : ""}>Enter pit</button>
+      <button data-action="exit-pit" ${!car.in_pit ? "disabled" : ""}>Exit pit (25s)</button>
+    </div>
+  `;
+
+  panel.querySelector('[data-action="lap"]').addEventListener("click", () => {
+    callCarAction(car.id, "/lap", null, (data) => {
+      const c = data.cars.find(x => x.id === car.id);
+      const parts = [`lap ${c.current_lap}/${c.total_laps} complete — tyre check: ${data.tyre_status}`];
+      if (data.tyre_status === "TYRE_ALERT_PIT_REQUIRED") parts.push("(pit required)");
+      if (c.finished) parts.push(`— FINISHED, total ${(c.total_time_ms/1000).toFixed(1)}s`);
+      return parts.join(" ");
+    });
+  });
+
+  panel.querySelector('[data-action="enter-pit"]').addEventListener("click", () => {
+    callCarAction(car.id, "/pit/enter", {}, () => "entered pit lane");
+  });
+
+  panel.querySelector('[data-action="exit-pit"]').addEventListener("click", () => {
+    callCarAction(car.id, "/pit/exit", { duration_ms: 25000 }, () => "exited pit (+25.0s), fresh tyres fitted");
+  });
+
+  panel.querySelector('[data-action="speed"]').addEventListener("click", () => {
+    const input = panel.querySelector('[data-role="speed-input"]');
+    const val = Number(input.value);
+    callCarAction(car.id, "/speed", { speed_kmph: val }, () => `speed recorded — ${val} kmph`);
+  });
+
+  return panel;
+}
+
+function renderWinner() {
+  const banner = document.getElementById("winnerBanner");
+  const winner = latestState.winner;
+  const payout = latestState.payout;
+  if (winner) {
+    banner.classList.add("show");
+    const payoutText = payout
+      ? `Sponsor payout: <b>${payout.amount ? payout.amount.toLocaleString() : ''}</b> ${payout.sponsor ? 'from ' + payout.sponsor : ''} — status: ${payout.status}`
+      : "Payout pending...";
+    banner.innerHTML = `🏁 WINNER: <b>${winner.driver_name}</b> (Car ${winner.id}) — total time ${(winner.total_time_ms/1000).toFixed(1)}s.<br>${payoutText}`;
+  } else {
+    banner.classList.remove("show");
+  }
+}
+
+document.getElementById("resetBtn").addEventListener("click", async () => {
+  const data = await api("/api/reset", { method: "POST" });
+  latestState = data;
+  document.getElementById("log").innerHTML = "";
+  log("Race reset — 2 cars, 3 laps each.");
+  render();
+});
+
+(async function init() {
+  try {
+    await refreshState();
+    setConnStatus(true);
+    log("Connected to backend — race initialized (2 cars, 3 laps each).");
+    setInterval(() => {
+      refreshState().catch(() => {});
+    }, 1500);
+  } catch (e) {
+    setConnStatus(false, e.message);
+    log(`Failed to reach backend: ${e.message}. Start it with: python3 app.py`);
+  }
+})();
+</script>
+</body>
+</html>
